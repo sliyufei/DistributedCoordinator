@@ -47,20 +47,29 @@ namespace DistributedCoordinator.Handlers
             if (!CheckCurrentNodeIsMinimumNode(parentPath, registerPath))
             {
                 //监听比自己小的节点
-                var sequentialNodes = GetNodeEntryList(parentPath).OrderBy(o => o.Order).ToList();
+                var sequentialNodes = GetChildrenSequentialNodeEntries(parentPath).OrderBy(o => o.Order).ToList();
                 var previousNode = PreviousNode(sequentialNodes, currentNode);
 
                 if (WatchNode(parentPath, previousNode))
                 {
-                    var watchNodePath = $"{parentPath}/{previousNode}";
+                    var identity = Guid.NewGuid();
+                    var watchPath = $"{parentPath}/{previousNode}";
 
-                    Console.WriteLine($"watchNodePath:{watchNodePath}");
-                    WorkerScheduler.Instance.AddWorker(watchNodePath);
+                    Console.WriteLine($"watchNodePath:{watchPath}");
+                    WorkerScheduler.Instance.AddWorker(watchPath);
 
-                    var receiveSignal = WorkerScheduler.Instance.Wait(watchNodePath, _options.Timeout);
+                    Coordinator.WatcherCachePool.TryAdd(identity, watchPath);
+                    var receiveSignal = WorkerScheduler.Instance.Wait(watchPath, _options.Timeout);
 
                     if (!receiveSignal)
+                    {
                         throw new TimeoutException("获取锁超时");
+                    }
+                    else
+                    {
+                        Coordinator.WatcherCachePool.TryRemove(identity, out watchPath);
+                    }    
+
 
                 }
 
@@ -73,6 +82,7 @@ namespace DistributedCoordinator.Handlers
         public void ReleaseLock()
         {
             Coordinator.Instance.DeleteNode(currentRegisterPath.Value);
+            Console.WriteLine($"ReleaseLock:{currentRegisterPath.Value},ThreadId:{Thread.CurrentThread.ManagedThreadId}");
         }
 
 
@@ -207,7 +217,7 @@ namespace DistributedCoordinator.Handlers
 
         private string PreviousNode(List<NodeEntry> nodeEntries, string currentNodePath)
         {
-            //自己变成第一个节点时需要返回空
+            //自己变成第一个节点时需要返回-1
             var currentNodeIndex = nodeEntries.FindIndex(o => o.Path == currentNodePath);
             return currentNodeIndex > 0 ? nodeEntries[currentNodeIndex - 1].Path : "-1";
         }

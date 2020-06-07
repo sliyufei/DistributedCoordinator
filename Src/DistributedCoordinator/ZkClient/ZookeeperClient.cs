@@ -25,20 +25,11 @@ namespace DistributedCoordinator.ZkClient
 
         private ZooKeeper CreateZooKeeper()
         {
-            return new ZooKeeper(Options.ConnectionString, (int)Options.SessionTimeout.TotalMilliseconds, this, Options.SessionId, Options.SessionPasswd);
+            return new ZooKeeper(Options.ConnectionString, (int)Options.SessionTimeout.TotalMilliseconds, this);
 
         }
 
-        public long GetSessionId()
-        {
-            return ZooKeeper.getSessionId();
-        }
-
-        public byte[] GetSessionPasswd()
-        {
-            return ZooKeeper.getSessionPasswd();
-        }
-
+     
         public string Create(string path, byte[] data, List<ACL> acls, CreateMode createMode)
         {
             return ZooKeeper.createAsync(path, data, acls, createMode).Result;
@@ -73,14 +64,15 @@ namespace DistributedCoordinator.ZkClient
 
             Console.WriteLine($"state:{state},type:{type},path:{path},Id:{Thread.CurrentThread.ManagedThreadId}");
 
-            Coordinator.Instance.SetCurrentState(state);
-
             if (state == Event.KeeperState.Expired)
             {
                 Coordinator.Instance.ReConnect();
             }
             else if (state == Event.KeeperState.SyncConnected)
             {
+                if (Coordinator.IsFirstConnected)
+                    Coordinator.IsFirstConnected = false;
+
                 CoordinatorScheduler.Instance.Set();
                 WatcherEvent(this, new WatcherArgs { Type = type, Path = path });
             }

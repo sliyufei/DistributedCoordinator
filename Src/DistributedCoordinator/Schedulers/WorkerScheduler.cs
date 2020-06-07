@@ -34,6 +34,7 @@ namespace DistributedCoordinator.Schedulers
                 return workerNotifyEvent.WaitOne(timeout);
             else
                 throw new ArgumentException();
+           
         }
 
         internal void Set(string key)

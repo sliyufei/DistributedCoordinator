@@ -19,22 +19,26 @@ namespace DistributedCoordinator
 
         private ZookeeperClientOptions zkOptions;
 
-        private Event.KeeperState _currentState;
-
         /// <summary>
         /// 指令缓冲区
         /// </summary>
-        public static ConcurrentQueue<Instruction> instructionsBuffer = new ConcurrentQueue<Instruction>();
+        private ConcurrentQueue<Instruction> instructionsBuffer = new ConcurrentQueue<Instruction>();
 
         /// <summary>
-        /// 当前指令处理结果
+        /// 指令结果
         /// </summary>
-        private static object currentCommandResult;
+        private ConcurrentDictionary<Guid, object> instructionsResult = new ConcurrentDictionary<Guid, object>();
+
+        public static ConcurrentDictionary<Guid, string> WatcherCachePool { get; set; } = new ConcurrentDictionary<Guid, string>();
 
         /// <summary>
         /// 执行指令的信号量
         /// </summary>
         private AutoResetEvent executeSignal = new AutoResetEvent(false);
+
+        private readonly object reConnectLock = new object();
+
+        public static bool IsFirstConnected { get; set; } = true;
 
         public static Coordinator Instance { get; private set; }
         static Coordinator()
@@ -44,18 +48,19 @@ namespace DistributedCoordinator
 
         public void Init()
         {
+
+            zkOptions = new ZookeeperClientOptions
+            {
+                ConnectionString = "47.93.242.4:2181"
+            };
+
+            zkClient = new ZookeeperClient(zkOptions);
+
             //注册事件
             RegisterEvent();
 
             //初始化组件
             InitComponents();
-
-            zkOptions = new ZookeeperClientOptions
-            {
-                ConnectionString = ""
-            };
-
-            zkClient = new ZookeeperClient(zkOptions);
 
             Console.WriteLine("zooKeeper wait..");
             CoordinatorScheduler.Instance.Wait(zkOptions.OperatingTimeout);
@@ -77,48 +82,56 @@ namespace DistributedCoordinator
         private void RegisterEvent()
         {
             zkClient.WatcherEvent += FairlockListener.Instance.Process;
+
         }
 
         public void ReConnect()
         {
-
+            if (!Monitor.TryEnter(reConnectLock, zkOptions.OperatingTimeout))
+                return;
             try
             {
+                if (zkClient != null)
+                    Close();
 
-                zkOptions.SessionId = zkClient.GetSessionId();
-                zkOptions.SessionPasswd = zkClient.GetSessionPasswd();
+                zkClient = new ZookeeperClient(zkOptions);
 
                 Console.WriteLine($"ReConnect:{Thread.CurrentThread.ManagedThreadId},options:{Newtonsoft.Json.JsonConvert.SerializeObject(zkOptions)}");
 
-                zkClient = new ZookeeperClient(zkOptions);
+
             }
-            catch (Exception ex)
+            finally
             {
-                Console.WriteLine(ex.StackTrace);
+                Monitor.Exit(reConnectLock);
             }
 
         }
 
-        public void SetCurrentState(Event.KeeperState state)
-        {
-            _currentState = state;
-        }
 
         public object AddInstruction(Func<object> command)
         {
+            var identity = Guid.NewGuid();
             var signal = new AutoResetEvent(false);
             instructionsBuffer.Enqueue(new Instruction
             {
+                Identity = identity,
                 Signal = signal,
                 Command = command
             });
 
+            Console.WriteLine($"AddInstruction:{Newtonsoft.Json.JsonConvert.SerializeObject(command.Target)}");
             //通知执行线程
             executeSignal.Set();
 
-            signal.WaitOne(zkOptions.OperatingTimeout);
+            var receiveSignal = signal.WaitOne(zkOptions.OperatingTimeout);
+            if (!receiveSignal)
+                throw new TimeoutException("等待执行指令超时");
 
-            return currentCommandResult;
+            object result = null;
+            if (!instructionsResult.TryRemove(identity, out result))
+                throw new ArgumentException("找不到指定结果");
+
+            return result;
         }
 
         private void ExecuteInstruction()
@@ -130,15 +143,16 @@ namespace DistributedCoordinator
 
                 while (true)
                 {
+
                     Instruction instruction = new Instruction();
+
+                    if (!instructionsBuffer.TryDequeue(out instruction))
+                        break;
+
                     try
                     {
-
-                        if (!instructionsBuffer.TryDequeue(out instruction))
-                            continue;
-
-                        currentCommandResult = RetryUntilConnected(instruction.Command);
-
+                        var result = RetryUntilConnected(instruction.Command);
+                        instructionsResult.TryAdd(instruction.Identity, result);
                     }
                     catch (Exception ex)
                     {
@@ -146,7 +160,7 @@ namespace DistributedCoordinator
                     }
                     finally
                     {
-                        instruction.Signal.Set();
+                        instruction?.Signal.Set();
                     }
 
                 }
@@ -181,14 +195,15 @@ namespace DistributedCoordinator
                         else if (e is KeeperException.NoNodeException)
                         {
                             keeperException = (KeeperException.NoNodeException)e;
+                            Console.WriteLine(e.ToString());
                             return true;
                         }
                         else if (e is KeeperException.NodeExistsException)
                         {
                             keeperException = (KeeperException.NodeExistsException)e;
+                            Console.WriteLine(e.ToString());
                             return true;
                         }
-
 
                         return false;
                     });
@@ -206,6 +221,7 @@ namespace DistributedCoordinator
                         return null;
                     case KeeperException ex when ex is KeeperException.NodeExistsException:
                         return null;
+
                 }
 
                 Thread.Sleep(1000);
@@ -216,16 +232,20 @@ namespace DistributedCoordinator
         private void WaitForSyncConnected()
         {
 
-            while (_currentState != Event.KeeperState.SyncConnected)
+            Console.WriteLine($"before.....Id：{ Thread.CurrentThread.ManagedThreadId}");
+            CoordinatorScheduler.Instance.Wait(zkOptions.OperatingTimeout);
+            Console.WriteLine("after");
+        }
+
+        public void ReRegisterWatcher()
+        {
+            foreach (var watcherCache in WatcherCachePool)
             {
-                Console.WriteLine($"before.state:{ _currentState}....Id：{ Thread.CurrentThread.ManagedThreadId}");
-                CoordinatorScheduler.Instance.Wait(zkOptions.OperatingTimeout);
-                Console.WriteLine("after" + _currentState);
+                zkClient.Exists(watcherCache.Value, true);
+                Console.WriteLine($"ReRegisterWatcher:{watcherCache.Value}");
             }
 
         }
-
-
 
         public void CreatePersistentNode(List<NodeEntry> nodeEntries)
         {

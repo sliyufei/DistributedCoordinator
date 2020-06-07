@@ -9,8 +9,8 @@ namespace DistributedCoordinator.ZkClient
 
         public ZookeeperClientOptions()
         {
-            SessionTimeout = TimeSpan.FromSeconds(30);
-            OperatingTimeout = TimeSpan.FromSeconds(60);
+            SessionTimeout = TimeSpan.FromSeconds(10);
+            OperatingTimeout = TimeSpan.FromSeconds(90);
             SessionId = 0;
             SessionPasswd = null;
         }
