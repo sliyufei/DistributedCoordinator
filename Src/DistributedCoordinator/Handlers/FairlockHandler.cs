@@ -170,7 +170,6 @@ namespace DistributedCoordinator.Handlers
               
                 if (nodeEntries != null && nodeEntries.Count > 0)
                 {
-                    Console.WriteLine($"GetChildrenSequentialNodeEntries:{Newtonsoft.Json.JsonConvert.SerializeObject(nodeEntries)}");
                     var firstNodePath = nodeEntries.FirstOrDefault().Path;
                     if (currentNode == firstNodePath)
                         result = true;
@@ -181,7 +180,6 @@ namespace DistributedCoordinator.Handlers
                     result = true;
                 }
             }
-            Console.WriteLine($"CheckCurrentNodeIsMinimumNode result:{result}");
             return result;
         }
 
@@ -235,15 +233,8 @@ namespace DistributedCoordinator.Handlers
 
                 if (CheckCurrentNodeIsMinimumNode(currentParentPath, currentPath))
                 {
-                    Task.Run(() =>
-                    {
-                        WorkerScheduler.Instance.Set(currentPath);
-                        Console.WriteLine($"CheckWaitDeletedNode:{currentPath}");
-                    });
-
-
-                   
-                   
+                    WorkerScheduler.Instance.Set(currentPath);
+                    Console.WriteLine($"CheckWaitDeletedNode:{currentPath}");
                 }
                     
             }

@@ -8,25 +8,26 @@ namespace DistributedCoordinator
     {
         static void Main(string[] args)
         {
-            //ThreadPool.SetMinThreads(100, 100);
-
+           
             Coordinator.Instance.Init();
 
-            Thread t = new Thread(() =>
-              {
-                  var fairlockOptions = new FairlockOptions
-                  {
-                      TenantId = 101200,
-                      Key = "ApplicantCheck",
-                      Timeout = TimeSpan.FromMinutes(1)
-                  };
+            for (int i = 0; i < 1; i++)
+            {
+                Thread t = new Thread(() =>
+                {
+                    var fairlockOptions = new FairlockOptions
+                    {
+                        TenantId = 101200,
+                        Key = "ApplicantCheck",
+                        Timeout = TimeSpan.FromMinutes(1)
+                    };
 
-                  Fairlock.Enter(fairlockOptions);
-                  Do();
-                  Fairlock.Exit();
-              });
-            t.Start();
-
+                    Fairlock.Enter(fairlockOptions);
+                    Do();
+                    Fairlock.Exit();
+                });
+                t.Start();
+            }
 
             Console.ReadLine();
         }

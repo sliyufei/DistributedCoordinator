@@ -9,6 +9,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using static org.apache.zookeeper.Watcher;
 
 namespace DistributedCoordinator
@@ -36,7 +37,7 @@ namespace DistributedCoordinator
         /// </summary>
         private AutoResetEvent executeSignal = new AutoResetEvent(false);
 
-        private readonly object reConnectLock = new object();
+        private static object reConnectLock = new object();
 
         private bool isWaitSyncConnected = false;
 
@@ -81,7 +82,6 @@ namespace DistributedCoordinator
 
         private void RegisterEvent()
         {
-            zkClient.WatcherEvent -= FairlockListener.Instance.Process;
             zkClient.WatcherEvent += FairlockListener.Instance.Process;
         }
 
@@ -104,7 +104,7 @@ namespace DistributedCoordinator
                 ReRegisterWatcher();
 
                 if (isWaitSyncConnected)
-                    CoordinatorScheduler.Instance.Wait(zkOptions.OperatingTimeout);
+                    CoordinatorScheduler.Instance.Set();
 
             }
             finally
@@ -126,7 +126,7 @@ namespace DistributedCoordinator
                 Command = command
             });
 
-            Console.WriteLine($"AddInstruction:{Newtonsoft.Json.JsonConvert.SerializeObject(command.Target)}");
+            Console.WriteLine($"AddInstruction:{Newtonsoft.Json.JsonConvert.SerializeObject(command.Target)},ThreadId:{Thread.CurrentThread.ManagedThreadId}");
             //通知执行线程
             executeSignal.Set();
 

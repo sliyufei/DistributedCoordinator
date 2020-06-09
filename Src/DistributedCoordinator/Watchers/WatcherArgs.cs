@@ -7,6 +7,7 @@ namespace DistributedCoordinator.Watchers
 {
     public class WatcherArgs : EventArgs
     {
+        public Event.KeeperState State { get; set; }
         public Event.EventType Type { get; set; }
         public string Path { get; set; }
     }

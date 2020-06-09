@@ -20,16 +20,27 @@ namespace DistributedCoordinator.Listeners
 
         public void Process(object sender, WatcherArgs args)
         {
+
             Console.WriteLine($"FairlockListener:path:{args.Path},Type:{args.Type},ThreadId:{Thread.CurrentThread.ManagedThreadId}");
 
-            var handler = new FairlockHandler();
-            handler.CheckWaitDeletedNode();
            
-            if (!args.Path.Contains("fairlocks"))
-                return;
+            if (args.State == Event.KeeperState.SyncConnected)
+            {
+                if (!args.Path.Contains("fairlocks"))
+                    return;
 
-            if (args.Type == Event.EventType.NodeDeleted)
-                WorkerScheduler.Instance.Set(args.Path);
+                if (args.Type == Event.EventType.NodeDeleted)
+                    WorkerScheduler.Instance.Set(args.Path);
+            }
+            else if (args.State == Event.KeeperState.Expired)
+            {
+                Task.Run(() =>
+                {
+                    var handler = new FairlockHandler();
+                    handler.CheckWaitDeletedNode();
+                });
+
+            }
 
         }
 

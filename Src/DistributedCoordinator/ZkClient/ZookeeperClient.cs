@@ -29,7 +29,7 @@ namespace DistributedCoordinator.ZkClient
 
         }
 
-     
+
         public string Create(string path, byte[] data, List<ACL> acls, CreateMode createMode)
         {
             return ZooKeeper.createAsync(path, data, acls, createMode).Result;
@@ -37,7 +37,7 @@ namespace DistributedCoordinator.ZkClient
 
         public bool Delete(string path, int version = -1)
         {
-             ZooKeeper.deleteAsync(path, version).Wait();
+            ZooKeeper.deleteAsync(path, version).Wait();
             return true;
         }
 
@@ -48,13 +48,12 @@ namespace DistributedCoordinator.ZkClient
 
         public ChildrenResult GetChildren(string path, bool watch = false)
         {
-            Console.WriteLine($"GetChildren,:{Thread.CurrentThread.ManagedThreadId}");
             return ZooKeeper.getChildrenAsync(path, watch).Result;
         }
 
         public void Close()
         {
-             ZooKeeper.closeAsync().Wait();
+            ZooKeeper.closeAsync().Wait();
         }
 
         public override Task process(WatchedEvent @event)
@@ -72,8 +71,9 @@ namespace DistributedCoordinator.ZkClient
             else if (state == Event.KeeperState.SyncConnected)
             {
                 CoordinatorScheduler.Instance.Set();
-                WatcherEvent(this, new WatcherArgs { Type = type, Path = path });
+
             }
+            WatcherEvent(this, new WatcherArgs { State = state, Type = type, Path = path });
 
             return Task.CompletedTask;
         }
