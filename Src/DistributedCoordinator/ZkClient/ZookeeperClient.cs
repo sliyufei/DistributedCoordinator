@@ -48,6 +48,7 @@ namespace DistributedCoordinator.ZkClient
 
         public ChildrenResult GetChildren(string path, bool watch = false)
         {
+            Console.WriteLine($"GetChildren,:{Thread.CurrentThread.ManagedThreadId}");
             return ZooKeeper.getChildrenAsync(path, watch).Result;
         }
 
@@ -70,9 +71,6 @@ namespace DistributedCoordinator.ZkClient
             }
             else if (state == Event.KeeperState.SyncConnected)
             {
-                if (Coordinator.IsFirstConnected)
-                    Coordinator.IsFirstConnected = false;
-
                 CoordinatorScheduler.Instance.Set();
                 WatcherEvent(this, new WatcherArgs { Type = type, Path = path });
             }

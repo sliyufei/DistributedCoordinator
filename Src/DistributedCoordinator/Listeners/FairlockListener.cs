@@ -1,8 +1,11 @@
-﻿using DistributedCoordinator.Schedulers;
+﻿using DistributedCoordinator.Handlers;
+using DistributedCoordinator.Schedulers;
 using DistributedCoordinator.Watchers;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using static org.apache.zookeeper.Watcher;
 
 namespace DistributedCoordinator.Listeners
@@ -17,11 +20,11 @@ namespace DistributedCoordinator.Listeners
 
         public void Process(object sender, WatcherArgs args)
         {
-            if (string.IsNullOrEmpty(args.Path))
-                return;
+            Console.WriteLine($"FairlockListener:path:{args.Path},Type:{args.Type},ThreadId:{Thread.CurrentThread.ManagedThreadId}");
 
-            Console.WriteLine($"FairlockListener:path:{args.Path},Type:{args.Type}");
-
+            var handler = new FairlockHandler();
+            handler.CheckWaitDeletedNode();
+           
             if (!args.Path.Contains("fairlocks"))
                 return;
 
@@ -29,5 +32,8 @@ namespace DistributedCoordinator.Listeners
                 WorkerScheduler.Instance.Set(args.Path);
 
         }
+
+
+
     }
 }

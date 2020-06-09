@@ -38,7 +38,7 @@ namespace DistributedCoordinator
 
         private readonly object reConnectLock = new object();
 
-        public static bool IsFirstConnected { get; set; } = true;
+        private bool isWaitSyncConnected = false;
 
         public static Coordinator Instance { get; private set; }
         static Coordinator()
@@ -81,8 +81,8 @@ namespace DistributedCoordinator
 
         private void RegisterEvent()
         {
+            zkClient.WatcherEvent -= FairlockListener.Instance.Process;
             zkClient.WatcherEvent += FairlockListener.Instance.Process;
-
         }
 
         public void ReConnect()
@@ -96,8 +96,15 @@ namespace DistributedCoordinator
 
                 zkClient = new ZookeeperClient(zkOptions);
 
-                Console.WriteLine($"ReConnect:{Thread.CurrentThread.ManagedThreadId},options:{Newtonsoft.Json.JsonConvert.SerializeObject(zkOptions)}");
+                RegisterEvent();
 
+                Console.WriteLine($"ReConnect:{Thread.CurrentThread.ManagedThreadId},options:{Newtonsoft.Json.JsonConvert.SerializeObject(zkOptions)}");
+                CoordinatorScheduler.Instance.Wait(zkOptions.OperatingTimeout);
+
+                ReRegisterWatcher();
+
+                if (isWaitSyncConnected)
+                    CoordinatorScheduler.Instance.Wait(zkOptions.OperatingTimeout);
 
             }
             finally
@@ -143,7 +150,6 @@ namespace DistributedCoordinator
 
                 while (true)
                 {
-
                     Instruction instruction = new Instruction();
 
                     if (!instructionsBuffer.TryDequeue(out instruction))
@@ -151,6 +157,8 @@ namespace DistributedCoordinator
 
                     try
                     {
+
+                      
                         var result = RetryUntilConnected(instruction.Command);
                         instructionsResult.TryAdd(instruction.Identity, result);
                     }
@@ -233,11 +241,13 @@ namespace DistributedCoordinator
         {
 
             Console.WriteLine($"before.....Id：{ Thread.CurrentThread.ManagedThreadId}");
+            isWaitSyncConnected = true;
             CoordinatorScheduler.Instance.Wait(zkOptions.OperatingTimeout);
+            isWaitSyncConnected = false;
             Console.WriteLine("after");
         }
 
-        public void ReRegisterWatcher()
+        private void ReRegisterWatcher()
         {
             foreach (var watcherCache in WatcherCachePool)
             {

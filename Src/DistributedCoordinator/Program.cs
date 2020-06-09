@@ -8,6 +8,7 @@ namespace DistributedCoordinator
     {
         static void Main(string[] args)
         {
+            //ThreadPool.SetMinThreads(100, 100);
 
             Coordinator.Instance.Init();
 

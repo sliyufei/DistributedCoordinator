@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace DistributedCoordinator.Handlers
 {
@@ -55,7 +56,7 @@ namespace DistributedCoordinator.Handlers
                     var identity = Guid.NewGuid();
                     var watchPath = $"{parentPath}/{previousNode}";
 
-                    Console.WriteLine($"watchNodePath:{watchPath}");
+                    Console.WriteLine($"watchNodePath:{watchPath},ThreadId:{Thread.CurrentThread.ManagedThreadId}");
                     WorkerScheduler.Instance.AddWorker(watchPath);
 
                     Coordinator.WatcherCachePool.TryAdd(identity, watchPath);
@@ -68,6 +69,7 @@ namespace DistributedCoordinator.Handlers
                     else
                     {
                         Coordinator.WatcherCachePool.TryRemove(identity, out watchPath);
+                        Console.WriteLine($"TryRemove:{watchPath}");
                     }    
 
 
@@ -165,9 +167,10 @@ namespace DistributedCoordinator.Handlers
             if (!string.IsNullOrEmpty(currentNode))
             {
                 var nodeEntries = GetChildrenSequentialNodeEntries(parentPath).OrderBy(o => o.Order).ToList();
-
+              
                 if (nodeEntries != null && nodeEntries.Count > 0)
                 {
+                    Console.WriteLine($"GetChildrenSequentialNodeEntries:{Newtonsoft.Json.JsonConvert.SerializeObject(nodeEntries)}");
                     var firstNodePath = nodeEntries.FirstOrDefault().Path;
                     if (currentNode == firstNodePath)
                         result = true;
@@ -178,6 +181,7 @@ namespace DistributedCoordinator.Handlers
                     result = true;
                 }
             }
+            Console.WriteLine($"CheckCurrentNodeIsMinimumNode result:{result}");
             return result;
         }
 
@@ -220,6 +224,29 @@ namespace DistributedCoordinator.Handlers
             //自己变成第一个节点时需要返回-1
             var currentNodeIndex = nodeEntries.FindIndex(o => o.Path == currentNodePath);
             return currentNodeIndex > 0 ? nodeEntries[currentNodeIndex - 1].Path : "-1";
+        }
+
+        public void CheckWaitDeletedNode()
+        {
+            foreach (var watcherCache in Coordinator.WatcherCachePool)
+            {
+                var currentPath = watcherCache.Value;
+                var currentParentPath= GetParentNode(currentPath);
+
+                if (CheckCurrentNodeIsMinimumNode(currentParentPath, currentPath))
+                {
+                    Task.Run(() =>
+                    {
+                        WorkerScheduler.Instance.Set(currentPath);
+                        Console.WriteLine($"CheckWaitDeletedNode:{currentPath}");
+                    });
+
+
+                   
+                   
+                }
+                    
+            }
         }
 
         public void GC()
