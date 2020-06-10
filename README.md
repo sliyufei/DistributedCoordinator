@@ -2,7 +2,7 @@
 使用.NetCore 3.1和zk实现的分布式公平锁
 
 ## 使用方法
-首先需要init一下协调者
+首先需要init一下协调者,请确保如下代码在当前进程内只实例化一次
 ``` C#
  Coordinator.Instance.Init();
 ```
