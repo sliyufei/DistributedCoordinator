@@ -10,13 +10,13 @@
 
 ``` C#
 var fairlockOptions = new FairlockOptions
-                    {
-                        TenantId = 101200,
-                        Key = "ApplicantCheck",
-                        Timeout = TimeSpan.FromMinutes(1)
-                    };
-
-                    Fairlock.Enter(fairlockOptions);
-                    //ToDo();
-                    Fairlock.Exit();
+     {
+          TenantId = 101200,
+          Key = "ApplicantCheck",
+          Timeout = TimeSpan.FromMinutes(1)
+      };
+      
+ Fairlock.Enter(fairlockOptions);
+ //ToDo();
+ Fairlock.Exit();
 ```
