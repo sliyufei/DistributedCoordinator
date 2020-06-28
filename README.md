@@ -20,3 +20,6 @@ var fairlockOptions = new FairlockOptions
  //ToDo();
  Fairlock.Exit();
 ```
+
+## 回收顺序节点
+调用 FairlockHandler.GC()即可
